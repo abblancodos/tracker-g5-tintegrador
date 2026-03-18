@@ -1,5 +1,4 @@
 # Firmware para Módulo Tracker LoRa/APRS
-# Firmware para Módulo Tracker LoRa/APRS
 
 **Grupo 5** — Taller Integrador  
 Instituto Tecnológico de Costa Rica, Escuela de Ingeniería Electrónica  
