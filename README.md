@@ -185,6 +185,13 @@ El sistema opera bajo el **Plan Nacional de Atribución de Frecuencias (PNAF)**,
 
 ---
 
+## Evidencias de avances y problemas 
+
+### Semana 5 - Programación inicial con repositorio de Richonguzman
+-Se realiza la configuración inicial en el dispositivo tracker según el repositorio de Richonguzman y se verifica su funcionamiento. Al cargar el firmware y el filesystem image se realiza la carga inicial del tracker donde se observa que recibe paquetes correctamente, sin embargo, en primera instancia no se logra que la ubicación se actualice mediante el GPS integrado al tracker al salir por un tiempo considerable al aire libre. 
+
+---
+
 ## Referencias
 
 - A. Maleki et al., "A Tutorial on Chirp Spread Spectrum Modulation for LoRaWAN," *IEEE Open Journal of the Communications Society*, vol. 5, 2024.
