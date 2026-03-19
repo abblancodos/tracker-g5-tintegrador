@@ -7,3 +7,6 @@
 ## Diagrama de bloques
 
 ![Bloques](diagrama_bloques.svg)
+
+## Programación de tracker inicial
+![Programacion](progra_inicial.svg)
