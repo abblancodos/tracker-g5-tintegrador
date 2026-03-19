@@ -9,10 +9,7 @@ Autores: Bonilla Andrés ([@abblancodos](https://github.com/abblancodos)), Chass
 
 ## Descripción del proyecto
 
-Este repositorio contiene el firmware desarrollado para un módulo tracker LoRa/APRS basado en el
-hardware TTGO T-Beam (ESP32 + SX1278). El tracker genera y transmite paquetes de posición GPS en
-formato APRS sobre la red LoRa-APRS, operando en la frecuencia 433.775 MHz conforme a la
-legislación costarricense (PNAF, Decreto N° 44010-MICITT).
+Este repositorio contiene el firmware desarrollado para un módulo tracker LoRa/APRS basado en el hardware TTGO T-Beam (ESP32 + SX1278). El tracker genera y transmite paquetes de posición GPS en formato APRS sobre la red LoRa-APRS, operando en la frecuencia 433.775 MHz conforme a la legislación costarricense (PNAF, Decreto N° 44010-MICITT).
 
 El firmware de referencia utilizado para pruebas base es [CA2RXU LoRa APRS Tracker](https://github.com/richonguzman/LoRa_APRS_Tracker). El firmware propio se desarrolla desde cero según los requerimientos del curso.
 
@@ -49,6 +46,7 @@ El objetivo es que los paquetes transmitidos sean recibidos por iGates locales (
 ---
 
 ## Estructura del repositorio
+
 ```
 .
 ├── src/
@@ -75,7 +73,6 @@ El objetivo es que los paquetes transmitidos sean recibidos por iGates locales (
 - [TinyGPS++](https://github.com/mikalhart/TinyGPSPlus) — Parseo de sentencias NMEA
 - [AXP202X_Library](https://github.com/lewisxhe/AXP202X_Library) — Control del PMIC AXP192
 - Firmware de referencia: [CA2RXU LoRa APRS Tracker](https://github.com/richonguzman/LoRa_APRS_Tracker)
-- Firmware de referencia: [CA2RXU LoRa APRS Tracker](https://github.com/richonguzman/LoRa_APRS_Tracker)
 
 Entorno de desarrollo: [PlatformIO](https://platformio.org/) sobre VSCode.
 
@@ -84,6 +81,7 @@ Entorno de desarrollo: [PlatformIO](https://platformio.org/) sobre VSCode.
 ## Configuración
 
 Antes de compilar, editar `include/config.h`:
+
 ```cpp
 #define CALLSIGN        "TU_INDICATIVO"
 #define SSID            9           // SSID APRS (0-15)
@@ -95,13 +93,11 @@ Antes de compilar, editar `include/config.h`:
 > **Nota legal:** La operación en 433.775 MHz en Costa Rica requiere licencia de radioaficionado
 > y licencia de estación ante SUTEL. Esta frecuencia no es de uso libre según el PNAF
 > (Decreto N° 44010-MICITT).
-> **Nota legal:** La operación en 433.775 MHz en Costa Rica requiere licencia de radioaficionado
-> y licencia de estación ante SUTEL. Esta frecuencia no es de uso libre según el PNAF
-> (Decreto N° 44010-MICITT).
 
 ---
 
 ## Compilación y carga
+
 ```bash
 git clone https://github.com/abblancodos/tracker-g5-tintegrador.git
 cd tracker-g5-tintegrador
@@ -138,10 +134,10 @@ El sistema opera bajo el **Plan Nacional de Atribución de Frecuencias (PNAF)**,
 
 | # | Responsable | Tarea | Estado |
 |---|-------------|-------|--------|
-| [#2](https://github.com/abblancodos/tracker-g5-tintegrador/issues/2) | Daniel | Cargar firmware de referencia (CA2RXU) y verificar GPS fix + TX LoRa | 🔄 En progreso |
-| [#3](https://github.com/abblancodos/tracker-g5-tintegrador/issues/3) | Daniel | Verificar aparición de paquetes en aprs.fi con firmware de referencia | ⏳ Pendiente |
-| [#4](https://github.com/abblancodos/tracker-g5-tintegrador/issues/4) | Andrés | Diseñar diagrama de bloques del firmware propio | ⏳ Pendiente |
-| [#5](https://github.com/abblancodos/tracker-g5-tintegrador/issues/5) | Andrés | Diseñar máquina de estados del firmware | ⏳ Pendiente |
+| [#2](https://github.com/abblancodos/tracker-g5-tintegrador/issues/2) | Daniel | Cargar firmware de referencia (CA2RXU) y verificar GPS fix + TX LoRa | ✅ Completado |
+| [#3](https://github.com/abblancodos/tracker-g5-tintegrador/issues/3) | Daniel | Verificar aparición de paquetes en aprs.fi con firmware de referencia | ✅ Completado |
+| [#4](https://github.com/abblancodos/tracker-g5-tintegrador/issues/4) | Andrés | Diseñar diagrama de bloques del firmware propio | ✅ Completado |
+| [#5](https://github.com/abblancodos/tracker-g5-tintegrador/issues/5) | Andrés | Diseñar máquina de estados del firmware | ✅ Completado |
 
 ### Semanas 6–8 — Desarrollo del firmware propio
 
@@ -191,12 +187,10 @@ El sistema opera bajo el **Plan Nacional de Atribución de Frecuencias (PNAF)**,
 
 ## Referencias
 
-- A. Maleki et al., "A Tutorial on Chirp Spread Spectrum Modulation for LoRaWAN," *IEEE Open
-  Journal of the Communications Society*, vol. 5, 2024.
+- A. Maleki et al., "A Tutorial on Chirp Spread Spectrum Modulation for LoRaWAN," *IEEE Open Journal of the Communications Society*, vol. 5, 2024.
 - B. Bruninga (WB4APR), "Automatic Packet Reporting System," aprs.org, 2015.
 - MICITT, "Plan Nacional de Atribución de Frecuencias," Decreto N° 44010-MICITT, 2023.
 - LilyGO, "TTGO T-Beam v1.1 Datasheet," GitHub, 2023.
-- CA2RXU, "LoRa APRS Tracker Reference Implementation," GitHub, 2026.
 - CA2RXU, "LoRa APRS Tracker Reference Implementation," GitHub, 2026.
 
 ---
