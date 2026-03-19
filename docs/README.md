@@ -9,4 +9,4 @@
 ![Bloques](diagrama_bloques.svg)
 
 ## Programación de tracker inicial
-![Programacion](progra_inicial.svg)
+![Programacion](progra_inicial.jpg)
