@@ -10,3 +10,6 @@
 
 ## Programación de tracker inicial
 ![Programacion](progra_inicial.jpg)
+
+## Programación de tracker con correcta ubicación
+![Programacion2](progra_inicial_buena.jpg)
