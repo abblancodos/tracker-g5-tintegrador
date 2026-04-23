@@ -1,0 +1,101 @@
+// ---- INICIALIZACION (una vez al arranque) ----
+FUNCION setup():
+  INICIALIZAR AXP192 (I2C, GPIO 21/22)
+    HABILITAR GPS, LoRa, LED
+  INICIALIZAR SX1278 (SPI)
+    FRECUENCIA  = 433.775 MHz
+    SF          = 12
+    BW          = 125 kHz
+    CR          = 4/5
+    SYNC_WORD   = 0x12
+    POTENCIA    = 20 dBm
+  INICIALIZAR UART GPS (9600 baud, GPIO 34)
+  CREAR tarea_gps  (nucleo 0)
+  CREAR tarea_lora (nucleo 1)
+  contadorError = 0
+  estado = GPS_WAIT
+
+// ---- TAREA GPS (nucleo 0, continua) ----
+FUNCION tarea_gps():
+  MIENTRAS VERDADERO HACER
+    linea = LEER_UART_GPS()
+    SI linea empieza con "$GPRMC" ENTONCES
+      campos = PARSEAR_CSV(linea)
+      SI campos[2] == 'A' ENTONCES  // Fix valido
+        gps.lat    = CONVERTIR_NMEA(campos[3,4])
+        gps.lon    = CONVERTIR_NMEA(campos[5,6])
+        gps.vel    = campos[7]      // nudos
+        gps.rum    = campos[8]      // grados
+        gps.valido = VERDADERO
+      SI NO
+        gps.valido = FALSO
+    ESPERAR 10 ms
+
+// ---- TAREA LoRa (nucleo 1) ----
+FUNCION tarea_lora():
+  MIENTRAS VERDADERO HACER
+
+    SI estado == GPS_WAIT ENTONCES
+      SI gps.valido OR timeout_5min ENTONCES
+        estado = BUILD_PKT
+
+    SI estado == BUILD_PKT ENTONCES
+      payload = CONSTRUIR_APRS(gps)
+      trama   = CONSTRUIR_AX25(CALLSIGN, payload)
+      estado  = TX_LORA
+
+    SI estado == TX_LORA ENTONCES
+      LED_ON()
+      ENVIAR_LORA(trama)
+      ESPERAR txDone            // interrupcion SX1278
+      LED_OFF()
+      estado = CONFIRMA         // verificar resultado TX
+
+    SI estado == CONFIRMA ENTONCES
+      SI confirmacion == 1 ENTONCES
+        // TX exitosa: reiniciar contador y continuar
+        contadorError = 0
+        estado = SLEEP
+      SI NO                     // confirmacion == 0
+        // TX fallida: incrementar contador de errores
+        contadorError = contadorError + 1
+        estado = ERROR
+
+    SI estado == ERROR ENTONCES
+      SI contadorError < 3 ENTONCES
+        // Reintentar: volver a construir y transmitir
+        estado = BUILD_PKT
+      SI NO                     // contadorError >= 3
+        // Reintentos agotados: ir a SLEEP y reiniciar contador
+        contadorError = 0
+        estado = SLEEP
+
+    SI estado == SLEEP ENTONCES
+      ESPERAR TX_INTERVAL_S     // light sleep 60 s
+      estado = GPS_WAIT
+
+    SI boton_pulsado ENTONCES
+      estado = BUILD_PKT        // transmision forzada
+
+    ESPERAR 50 ms
+
+// ---- CONSTRUCCION DEL PAYLOAD APRS ----
+FUNCION CONSTRUIR_APRS(gps):
+  // Formato: !DDMM.mmN/DDDMM.mmW>CSE/SPD/A=AAAAAA comentario
+  lat = FORMATO_LAT(gps.lat)    // ej. 0959.87N
+  lon = FORMATO_LON(gps.lon)    // ej. 08403.54W
+  RETORNAR "!" + lat + "/" + lon + ">"
+         + FORMATO_RUMBO(gps.rum) + "/"
+         + FORMATO_VEL(gps.vel)  + "/A="
+         + FORMATO_ALT(gps.alt)  + " TEC-GR5 v1.0"
+
+// ---- CONSTRUCCION DE LA TRAMA AX.25 UI ----
+FUNCION CONSTRUIR_AX25(src_call, info):
+  dest    = CODIFICAR_AX25("APRS  ")
+  origen  = CODIFICAR_AX25(src_call)
+  digi1   = CODIFICAR_AX25("WIDE1-1")
+  digi2   = CODIFICAR_AX25("WIDE2-1")
+  control = 0x03                // UI frame
+  pid     = 0xF0                // No Layer 3
+  RETORNAR dest + origen + digi1 + digi2
+         + control + pid + info
