@@ -189,9 +189,22 @@ El sistema opera bajo el **Plan Nacional de Atribución de Frecuencias (PNAF)**,
 
 ### Semana 5 - Programación inicial con repositorio de Richonguzman
 - Se realiza la configuración inicial en el dispositivo tracker según el repositorio de Richonguzman y se verifica su funcionamiento. Al cargar el firmware y el filesystem image se realiza la carga inicial del tracker donde se observa que recibe paquetes correctamente, sin embargo, en primera instancia no se logra que la ubicación se actualice mediante el GPS integrado al tracker al salir por un tiempo considerable al aire libre.
-- Se realiza la configuración del tracker desde cero, verificando su modelo exacto, y se logra corregir el problema de notificar la ubicación mediante el GPS integrado al dispositivo. Se verifica en aprs.fi que la actualización del tracker Ti0Tec-7 se realizó de manera exitosa.  
+- Se realiza la configuración del tracker desde cero, verificando su modelo exacto, y se logra corregir el problema de notificar la ubicación mediante el GPS integrado al dispositivo. Se verifica en aprs.fi que la actualización del tracker Ti0Tec-7 se realizó de manera exitosa.
 
----
+### Semana 6-9 - Desarrollo de la propuesta inicial ---
+- Se identifica y documenta el modelo exacto del hardware asignado (T-Beam AXP2101 v1.2), verificando los componentes integrados: ESP32 dual-core, chip de radio SX1278 para la banda de 433 MHz, módulo GPS Neo-6M/8M, y PMIC AXP2101 como gestor de energía.
+- Se diseña el diagrama eléctrico del módulo tracker, documentando las conexiones entre periféricos: GPS por UART2, radio SX1278 por SPI , y AXP2101 por I2C.
+- Se justifica técnicamente la selección de cada periférico y el protocolo de comunicación utilizado, explicando por qué se usa UART para el GPS, SPI para el radio e I2C
+- Se elabora la infografía del sistema mostrando la arquitectura general del tracker y la relación entre sus componentes.
+- Se elabora el presupuesto del proyecto detallando el costo de los componentes del módulo tracker asignado.
+- Se elabora el cronograma de trabajo para las semanas restantes del semestre que corresponde desde semana 9 hasta semana 16.
+- Se desarrolla el pseudocódigo completo de la rutina de lectura de sentencias NMEA del GPS, incluyendo la inicialización del AXP2101 para habilitar el voltaje al módulo GPS, apertura del UART2, parseo de la sentencia `$GPRMC` y conversión de coordenadas de formato DDMM.MM a grados decimales. 
+- Se desarrolla el pseudocódigo de la rutina de configuración del radio SX1278, definiendo los parámetros de RF según la legislación costarricense (PNAF, Decreto 44010-MICITT): frecuencia 433.775 MHz, SF12, BW 125 kHz, CR 4/5, sync word 0x12 y potencia de 20 dBm.
+- Se diseña la máquina de estados del firmware con los estados `GPS_WAIT`, `BUILD_PKT`, `TX_LORA`, `CONFIRMA`, `ERROR` y `SLEEP`, incluyendo la lógica de reintentos con máximo 3 intentos antes de volver a `SLEEP`.
+- Se define la estructura completa de la trama APRS, documentando cada campo: callsign-SSID, ToCall `APLR01`, path `WIDE1-1`/`WIDE2-1`, tipo `@`, timestamp UTC, latitud en formato `DDMM.MMN`, longitud en formato `DDDMM.MMW`, símbolo de vehículo, curso, velocidad en nudos, altitud en pies y comentario libre.
+- Se elabora el diagrama de bloques del firmware, diferenciando los bloques de hardware externo (GPS, AXP2101, SX1278, antena, iGate) de los bloques funcionales internos del ESP32 (bloque GPS, bloque timer, bloque APRS, bloque LoRa TX, sleep/idle).
+- Se desarrolla el código base en C++ que será trabajado en las proximas semanas con el fin de implementar correctamente el firmware propio en el tracker asigndado. 
+- Se sube el código base al repositorio del grupo en GitHub con comentarios en cada bloque explicando la lógica implementada.
 
 ## Referencias
 
