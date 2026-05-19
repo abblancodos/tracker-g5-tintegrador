@@ -33,7 +33,7 @@
 // ─────────────────────────────────────────────────────────────
 //  PARÁMETROS APRS
 // ─────────────────────────────────────────────────────────────
-#define CALLSIGN        "TI3GR5-9"
+#define CALLSIGN        "TI0TEC5-7"
 #define TOCALL          "APLR01"
 #define PATH1           "WIDE1-1"
 #define PATH2           "WIDE2-1"
