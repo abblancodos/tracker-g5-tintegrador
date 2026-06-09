@@ -4,47 +4,39 @@
 #include <Wire.h>
 #include <XPowersLib.h>
 
-// ─────────────────────────────────────────────────────────────
-//  PINES — T-Beam AXP2101 v1.2
-// ─────────────────────────────────────────────────────────────
 #define GPS_RX_PIN      34
 #define GPS_TX_PIN      12
+
 #define LORA_SCK        5
 #define LORA_MOSI       27
 #define LORA_MISO       19
 #define LORA_CS         18
 #define LORA_RST        23
 #define LORA_DIO0       26
+
 #define AXP_SDA         21
 #define AXP_SCL         22
+
 #define LED_PIN         4
 #define BTN_PIN         38
 
-// ─────────────────────────────────────────────────────────────
-//  PARÁMETROS LoRa — PNAF CR (Decreto 44010-MICITT)
-// ─────────────────────────────────────────────────────────────
-#define LORA_FREQ       433775000   // 433.775 MHz
+#define LORA_FREQ       433775000
 #define LORA_SF         12
-#define LORA_BW         125000      // 125 kHz
-#define LORA_CR         5           // 4/5
-#define LORA_SYNCWORD   0x12        // LoRa-APRS estándar
-#define LORA_PWR        20          // 20 dBm
+#define LORA_BW         125000
+#define LORA_CR         5
+#define LORA_SYNCWORD   0x12
+#define LORA_PWR        20
 
-// ─────────────────────────────────────────────────────────────
-//  PARÁMETROS APRS
-// ─────────────────────────────────────────────────────────────
 #define CALLSIGN        "TI0TEC5-7"
 #define TOCALL          "APLR01"
 #define PATH1           "WIDE1-1"
 #define PATH2           "WIDE2-1"
 #define COMENTARIO      "TEC-GR5 v1.0"
-#define TX_INTERVAL_S   60          // intervalo light sleep (segundos)
-#define GPS_TIMEOUT_MS  300000      // 5 minutos de timeout GPS
 
-// ─────────────────────────────────────────────────────────────
-//  MÁQUINA DE ESTADOS
-// ─────────────────────────────────────────────────────────────
-enum Estado {
+#define TX_INTERVAL_S   60
+
+enum Estado
+{
     GPS_WAIT,
     BUILD_PKT,
     TX_LORA,
@@ -53,151 +45,503 @@ enum Estado {
     SLEEP_ST
 };
 
-// ─────────────────────────────────────────────────────────────
-//  DATOS GPS (compartidos entre tareas vía mutex)
-// ─────────────────────────────────────────────────────────────
-struct DatosGPS {
-    float  lat     = 0.0f;
-    float  lon     = 0.0f;
-    float  alt     = 0.0f;   // metros
-    float  vel     = 0.0f;   // nudos
-    float  rum     = 0.0f;   // grados
-    bool   valido  = false;
-    String hora    = "000000";
+struct DatosGPS
+{
+    float lat = 0.0f;
+    float lon = 0.0f;
+    float alt = 0.0f;
+    float vel = 0.0f;
+    float rum = 0.0f;
+    bool valido = false;
+    String hora = "000000";
 };
 
-// ─────────────────────────────────────────────────────────────
-//  VARIABLES GLOBALES
-// ─────────────────────────────────────────────────────────────
-volatile Estado     estadoActual  = GPS_WAIT;
-volatile bool       txDone        = false;
-volatile bool       botonPulsado  = false;
-volatile bool       confirmacion  = false;
-volatile int        contadorError = 0;
+volatile Estado estadoActual = GPS_WAIT;
+volatile bool txDone = false;
+volatile bool botonPulsado = false;
 
-DatosGPS            gps;
-SemaphoreHandle_t   gpsMutex;
-XPowersAXP2101      axp;
-HardwareSerial      gpsSerial(2);   // UART2
+DatosGPS gps;
 
-String              trama = "";
+SemaphoreHandle_t gpsMutex;
 
-// ─────────────────────────────────────────────────────────────
-//  PROTOTIPOS
-// ─────────────────────────────────────────────────────────────
-bool   inicializarAXP2101();
-bool   inicializarLoRa();
-bool   inicializarGPS();
-void   tareaGPS(void* param);
-void   tareaLoRa(void* param);
-String construirAPRS(const DatosGPS& g);
-String construirAX25(const String& srcCall, const String& info);
-float  convertirNMEA(const String& raw, char hemisferio);
-String formatLat(float lat);
-String formatLon(float lon);
-String formatRumbo(float rum);
-String formatVel(float vel);
-String formatAlt(float alt);
-void   IRAM_ATTR isrTxDone();
-void   IRAM_ATTR isrBoton();
+XPowersAXP2101 axp;
 
-// ─────────────────────────────────────────────────────────────
-//  SETUP — corre una sola vez al arranque
-// ─────────────────────────────────────────────────────────────
-void setup() {
-    Serial.begin(115200);
-    Serial.println("[BOOT] Tracker TEC-GR5 iniciando...");
+HardwareSerial gpsSerial(2);
 
-    pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, LOW);
+String trama;
 
-    // Botón con interrupción para forzar TX
-    pinMode(BTN_PIN, INPUT_PULLUP);
-    attachInterrupt(BTN_PIN, isrBoton, FALLING);
+bool inicializarAXP2101()
+{
+    Wire.begin(AXP_SDA, AXP_SCL);
 
-    // Mutex para acceso seguro a struct gps entre tareas
-    gpsMutex = xSemaphoreCreateMutex();
-
-    // 1. Inicializar PMIC AXP2101 (I2C)
-    if (!inicializarAXP2101()) {
-        Serial.println("[ERROR] AXP2101 no responde");
-        while (true) { delay(1000); }  // halt
+    if (!axp.begin(Wire))
+    {
+        return false;
     }
 
-    // 2. Inicializar radio SX1278 (SPI)
-    if (!inicializarLoRa()) {
-        Serial.println("[ERROR] SX1278 no responde");
-        while (true) { delay(1000); }  // halt
-    }
-
-    // 3. Inicializar GPS (UART2)
-    if (!inicializarGPS()) {
-        Serial.println("[ERROR] GPS UART no abre");
-        while (true) { delay(1000); }  // halt
-    }
-
-    contadorError = 0;
-    estadoActual  = GPS_WAIT;
-
-    // 4. Crear tareas en núcleos independientes
-    xTaskCreatePinnedToCore(tareaGPS,  "tarea_gps",  4096, NULL, 1, NULL, 0);
-    xTaskCreatePinnedToCore(tareaLoRa, "tarea_lora", 8192, NULL, 1, NULL, 1);
-
-    Serial.println("[OK] Tareas lanzadas — sistema listo");
+    return true;
 }
 
-void loop() {
-    // El loop queda vacío: todo corre en las tareas FreeRTOS
-    vTaskDelay(portMAX_DELAY);
+bool inicializarGPS()
+{
+    gpsSerial.begin(
+        9600,
+        SERIAL_8N1,
+        GPS_RX_PIN,
+        GPS_TX_PIN
+    );
+
+    return true;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  TAREA GPS — núcleo 0, continua
-//  Lee UART2, parsea $GPRMC, actualiza struct gps con mutex
-// ─────────────────────────────────────────────────────────────
-void tareaGPS(void* param) {
+bool inicializarLoRa()
+{
+    SPI.begin(
+        LORA_SCK,
+        LORA_MISO,
+        LORA_MOSI,
+        LORA_CS
+    );
+
+    LoRa.setPins(
+        LORA_CS,
+        LORA_RST,
+        LORA_DIO0
+    );
+
+    if (!LoRa.begin(LORA_FREQ))
+    {
+        return false;
+    }
+
+    LoRa.setSpreadingFactor(LORA_SF);
+    LoRa.setSignalBandwidth(LORA_BW);
+    LoRa.setCodingRate4(LORA_CR);
+    LoRa.setSyncWord(LORA_SYNCWORD);
+    LoRa.setTxPower(LORA_PWR);
+
+    return true;
+}
+
+float convertirNMEA(
+    const String& raw,
+    char hemisferio)
+{
+    if (raw.length() < 4)
+    {
+        return 0.0f;
+    }
+
+    float valor = raw.toFloat();
+
+    int grados = (int)(valor / 100);
+
+    float minutos =
+        valor - (grados * 100);
+
+    float decimal =
+        grados + (minutos / 60.0f);
+
+    if (
+        hemisferio == 'S' ||
+        hemisferio == 'W'
+    )
+    {
+        decimal *= -1.0f;
+    }
+
+    return decimal;
+}
+
+String formatLat(float lat)
+{
+    char buf[16];
+
+    char hemi =
+        lat >= 0 ? 'N' : 'S';
+
+    lat = fabs(lat);
+
+    int deg = (int)lat;
+
+    float min =
+        (lat - deg) * 60.0;
+
+    sprintf(
+        buf,
+        "%02d%05.2f%c",
+        deg,
+        min,
+        hemi
+    );
+
+    return String(buf);
+}
+
+String formatLon(float lon)
+{
+    char buf[16];
+
+    char hemi =
+        lon >= 0 ? 'E' : 'W';
+
+    lon = fabs(lon);
+
+    int deg = (int)lon;
+
+    float min =
+        (lon - deg) * 60.0;
+
+    sprintf(
+        buf,
+        "%03d%05.2f%c",
+        deg,
+        min,
+        hemi
+    );
+
+    return String(buf);
+}
+
+String construirAPRS(const DatosGPS& g)
+{
+    String lat = formatLat(g.lat);
+    String lon = formatLon(g.lon);
+
+    String info =
+        "!" +
+        lat +
+        "/" +
+        lon +
+        ">" +
+        COMENTARIO;
+
+    String pkt =
+        String(CALLSIGN) +
+        ">" +
+        TOCALL +
+        "," +
+        PATH1 +
+        "," +
+        PATH2 +
+        ":" +
+        info;
+
+    return pkt;
+}
+
+void IRAM_ATTR isrBoton()
+{
+    botonPulsado = true;
+}
+
+void IRAM_ATTR isrTxDone()
+{
+    txDone = true;
+}
+
+void tareaGPS(void* param)
+{
     String linea = "";
 
-    while (true) {
-        // Leer byte a byte hasta '\n'
-        while (gpsSerial.available()) {
+    while (true)
+    {
+        while (gpsSerial.available())
+        {
             char c = gpsSerial.read();
-            if (c == '\n') {
+
+            if (c == '\n')
+            {
                 linea.trim();
 
-                // Solo procesar sentencias $GPRMC o $GNRMC
-                if (linea.startsWith("$GPRMC") || linea.startsWith("$GNRMC")) {
-                    // Separar campos por coma
+                if (
+                    linea.startsWith("$GPRMC") ||
+                    linea.startsWith("$GNRMC")
+                )
+                {
                     String campos[12];
-                    int n = 0, prev = 0;
-                    for (int i = 0; i <= linea.length() && n < 12; i++) {
-                        if (i == linea.length() || linea[i] == ',') {
-                            campos[n++] = linea.substring(prev, i);
+
+                    int n = 0;
+                    int prev = 0;
+
+                    for (
+                        int i = 0;
+                        i <= linea.length() && n < 12;
+                        i++
+                    )
+                    {
+                        if (
+                            i == linea.length() ||
+                            linea[i] == ','
+                        )
+                        {
+                            campos[n++] =
+                                linea.substring(prev, i);
+
                             prev = i + 1;
                         }
                     }
 
-                    if (xSemaphoreTake(gpsMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                        if (campos[2] == "A") {
-                            // Fix válido — extraer datos
-                            gps.lat    = convertirNMEA(campos[3], campos[4][0]);
-                            gps.lon    = convertirNMEA(campos[5], campos[6][0]);
-                            gps.vel    = campos[7].toFloat();   // nudos
-                            gps.rum    = campos[8].toFloat();   // grados
-                            gps.hora   = campos[1].substring(0, 6);
+                    if (
+                        xSemaphoreTake(
+                            gpsMutex,
+                            pdMS_TO_TICKS(50)
+                        ) == pdTRUE
+                    )
+                    {
+                        if (campos[2] == "A")
+                        {
+                            gps.lat =
+                                convertirNMEA(
+                                    campos[3],
+                                    campos[4][0]
+                                );
+
+                            gps.lon =
+                                convertirNMEA(
+                                    campos[5],
+                                    campos[6][0]
+                                );
+
+                            gps.vel =
+                                campos[7].toFloat();
+
+                            gps.rum =
+                                campos[8].toFloat();
+
+                            gps.hora =
+                                campos[1].substring(0, 6);
+
                             gps.valido = true;
-                        } else {
-                            // Sin fix
+                        }
+                        else
+                        {
                             gps.valido = false;
                         }
+
                         xSemaphoreGive(gpsMutex);
                     }
                 }
+
                 linea = "";
-            } else {
+            }
+            else
+            {
                 linea += c;
             }
         }
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+}
+
+void tareaLoRa(void* param)
+{
+    DatosGPS copiaGPS;
+
+    while (true)
+    {
+        switch (estadoActual)
+        {
+            case GPS_WAIT:
+
+                if (botonPulsado)
+                {
+                    botonPulsado = false;
+                    estadoActual = BUILD_PKT;
+                }
+
+                if (
+                    xSemaphoreTake(
+                        gpsMutex,
+                        pdMS_TO_TICKS(50)
+                    ) == pdTRUE
+                )
+                {
+                    copiaGPS = gps;
+
+                    xSemaphoreGive(gpsMutex);
+
+                    if (copiaGPS.valido)
+                    {
+                        estadoActual = BUILD_PKT;
+                    }
+                }
+
+                break;
+
+            case BUILD_PKT:
+
+                if (
+                    xSemaphoreTake(
+                        gpsMutex,
+                        pdMS_TO_TICKS(50)
+                    ) == pdTRUE
+                )
+                {
+                    copiaGPS = gps;
+                    xSemaphoreGive(gpsMutex);
+                }
+
+                trama =
+                    construirAPRS(
+                        copiaGPS
+                    );
+
+                Serial.println("[APRS]");
+                Serial.println(trama);
+
+                estadoActual = TX_LORA;
+
+                break;
+
+            case TX_LORA:
+
+                digitalWrite(
+                    LED_PIN,
+                    HIGH
+                );
+
+                LoRa.beginPacket();
+                LoRa.print(trama);
+                LoRa.endPacket();
+
+                digitalWrite(
+                    LED_PIN,
+                    LOW
+                );
+
+                estadoActual = CONFIRMA;
+
+                break;
+
+            case CONFIRMA:
+
+                Serial.println(
+                    "[OK] Trama transmitida"
+                );
+
+                estadoActual = SLEEP_ST;
+
+                break;
+
+            case ERROR_TX:
+
+                estadoActual = GPS_WAIT;
+
+                break;
+
+            case SLEEP_ST:
+
+                Serial.printf(
+                    "[SLEEP] %d segundos\n",
+                    TX_INTERVAL_S
+                );
+
+                vTaskDelay(
+                    pdMS_TO_TICKS(
+                        TX_INTERVAL_S * 1000
+                    )
+                );
+
+                estadoActual = GPS_WAIT;
+
+                break;
+        }
+
+        vTaskDelay(
+            pdMS_TO_TICKS(100)
+        );
+    }
+}
+
+void setup()
+{
+    Serial.begin(115200);
+
+    pinMode(
+        LED_PIN,
+        OUTPUT
+    );
+
+    pinMode(
+        BTN_PIN,
+        INPUT_PULLUP
+    );
+
+    attachInterrupt(
+        BTN_PIN,
+        isrBoton,
+        FALLING
+    );
+
+    gpsMutex =
+        xSemaphoreCreateMutex();
+
+    if (!inicializarAXP2101())
+    {
+        Serial.println(
+            "AXP2101 ERROR"
+        );
+
+        while (true)
+        {
+            delay(1000);
+        }
+    }
+
+    if (!inicializarLoRa())
+    {
+        Serial.println(
+            "LORA ERROR"
+        );
+
+        while (true)
+        {
+            delay(1000);
+        }
+    }
+
+    if (!inicializarGPS())
+    {
+        Serial.println(
+            "GPS ERROR"
+        );
+
+        while (true)
+        {
+            delay(1000);
+        }
+    }
+
+    xTaskCreatePinnedToCore(
+        tareaGPS,
+        "gps",
+        4096,
+        NULL,
+        1,
+        NULL,
+        0
+    );
+
+    xTaskCreatePinnedToCore(
+        tareaLoRa,
+        "lora",
+        8192,
+        NULL,
+        1,
+        NULL,
+        1
+    );
+
+    Serial.println(
+        "Tracker iniciado"
+    );
+}
+
+void loop()
+{
+    vTaskDelay(
+        portMAX_DELAY
+    );
 }
