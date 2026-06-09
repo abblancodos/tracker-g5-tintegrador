@@ -171,7 +171,7 @@ El frame transmitido sigue el estándar LoRa-APRS con posición codificada en Ba
 
 Ejemplo:
 ```
-<TI5GR5-9>APLRT1,WIDE1-1,WIDE2-1:!<base91pos> Bat=3.92V (45mA)
+<TI0TEC-7>APLRT1,WIDE1-1,WIDE2-1:!<base91pos> Bat=3.92V (45mA)
 ```
 
 ---
