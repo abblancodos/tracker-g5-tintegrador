@@ -13,3 +13,6 @@
 
 ## Programación de tracker con correcta ubicación
 ![Programacion2](progra_inicial_buena.jpg)
+
+## Pruebas de campo con firmware desarrollado
+![Prueba](prueba_campo.png)
